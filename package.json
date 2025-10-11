@@ -1,0 +1,40 @@
+{
+  "name": "tasksync-api",
+  "version": "1.0.0",
+  "description": "Real-time collaborative task management API",
+  "private": true,
+  "workspaces": [
+    "services/user-service",
+    "services/task-service",
+    "services/notification-service"
+  ],
+  "scripts": {
+    "start": "docker-compose up --build",
+    "start:dev": "npm run dev --workspaces",
+    "dev:user": "npm run dev --prefix services/user-service",
+    "dev:task": "npm run dev --prefix services/task-service",
+    "dev:notification": "npm run dev --prefix services/notification-service",
+    "test": "npm run test --workspaces",
+    "test:user": "npm run test --prefix services/user-service",
+    "test:task": "npm run test --prefix services/task-service",
+    "test:notification": "npm run test --prefix services/notification-service",
+    "lint": "eslint services/**/*.js",
+    "format": "prettier --write services/**/*.js",
+    "build": "npm run build --workspaces",
+    "docker:build": "docker-compose build",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.3",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "mongodb-memory-server": "^10.0.0",
+    "redis-mock": "^0.56.3"
+  },
+  "dependencies": {
+    "swagger-ui-express": "^5.0.1",
+    "winston": "^3.14.2",
+    "prom-client": "^15.1.3"
+  }
+}
