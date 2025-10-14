@@ -23,7 +23,7 @@ app.use((_req, res, next) => {
   next(err)
 })
 
-app.use((err, req, res, next) => {
+app.use((err, _req, res, _next) => {
   res.status(err.status || 500)
 
   res.json({
