@@ -6,21 +6,35 @@ import cors from "cors"
 const port = 3001
 
 const app = express()
-app.use(cors)
 
 app.get("/", (_req, res) => {
   return res.redirect(`http://localhost:${port}/health`)
 })
 
 app.get("/health", (_req, res) => {
-  return res.json({ online: true })
+  return res.json({ online: true, name: "Notification service" })
 })
 
-app.use((_req, res) => {
-  console.log("here")
-  return res.status(400).end("Not found!")
+app.use((_req, res, next) => {
+  const err = new Error("Not found")
+
+  res.status(400)
+
+  next(err)
 })
 
+app.use((err, req, res, next) => {
+  res.status(err.status || 500)
+
+  res.json({
+    error: {
+      message: err.message,
+      status: err.status || 500,
+    },
+  })
+})
+
+app.use(cors)
 app.listen(port, () => {
   return console.log(`App listening at http://localhost:${port}`)
 })

@@ -12,7 +12,26 @@ app.get("/", (_req, res) => {
 })
 
 app.get("/health", (_req, res) => {
-  return res.json({ online: true })
+  return res.json({ online: true, name: "Task service" })
+})
+
+app.use((_req, res, next) => {
+  const err = new Error("Not found")
+
+  res.status(400)
+
+  next(err)
+})
+
+app.use((err, req, res, next) => {
+  res.status(err.status || 500)
+
+  res.json({
+    error: {
+      message: err.message,
+      status: err.status || 500,
+    },
+  })
 })
 
 app.use(cors)
