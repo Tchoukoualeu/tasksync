@@ -1,5 +1,7 @@
 import express from "express"
 import cors from "cors"
+import { closeDB } from "../../../shared/config/db"
+import { userRouter } from "./controllers/user"
 
 // User service
 
@@ -10,10 +12,13 @@ const app = express()
 app.get("/", (_req, res) => {
   return res.redirect(`http://localhost:${port}/health`)
 })
+app.use(express.json())
 
 app.get("/health", (_req, res) => {
   return res.json({ online: true, name: "User service" })
 })
+
+app.use("/users", userRouter)
 
 app.use((_req, res, next) => {
   const err = new Error("Not found")
@@ -36,6 +41,14 @@ app.use((err, _req, res, _next) => {
 
 app.use(cors)
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   return console.log(`App listening at http://localhost:${port}`)
+})
+
+process.on("SIGINT", () => {
+  console.log("Shutting down...")
+  server.close(() => {
+    closeDB()
+    process.exit(0)
+  })
 })
