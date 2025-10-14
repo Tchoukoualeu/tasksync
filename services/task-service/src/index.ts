@@ -1,9 +1,9 @@
 import express from "express"
 import cors from "cors"
 
-// User service
+// Task service
 
-const port = 3003
+const port = 3002
 
 const app = express()
 
