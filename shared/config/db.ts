@@ -1,26 +1,28 @@
 // db.js - Shared DB connection and initialization
 
 import Database from "better-sqlite3"
+import { v4 as uuidv4 } from "uuid"
 
 let dbInstance: Database.Database | null = null
 
 function getDB() {
   if (!dbInstance) {
     dbInstance = new Database("./mydb.db")
+
     console.log("Connected to SQLite database.")
 
     // Initialize schema (idempotent)
     // tasks (title, description, status, assignee, comments).
     dbInstance.exec(`
       CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         password TEXT NOT NULL,
         role TEXT NOT NULL,
         email TEXT UNIQUE
       );
 
         CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         description TEXT,
         status TEXT NOT NULL,
@@ -32,8 +34,8 @@ function getDB() {
 
     // insert a default user if none exists
     dbInstance.exec(`
-      INSERT INTO users (password, role, email)
-      SELECT 'adminpass', 'admin', 'admin@example.com'
+      INSERT INTO users (id, password, role, email)
+      SELECT '${uuidv4()}', 'adminpass', 'admin', 'admin@example.com'
       WHERE NOT EXISTS (SELECT 1 FROM users)
     `)
 
