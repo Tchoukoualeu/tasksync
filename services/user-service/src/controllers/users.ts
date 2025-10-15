@@ -59,6 +59,7 @@ userRouter
       const insertUser = dbInstance.prepare(
         "INSERT INTO users (id, password, role, email) VALUES (?, ?, ?, ?)",
       )
+
       insertUser.run(uuidv4(), hashedPass, "admin", email)
 
       const getUserWithoutPassword = dbInstance.prepare(

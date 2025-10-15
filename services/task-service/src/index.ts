@@ -1,5 +1,7 @@
 import express from "express"
 import cors from "cors"
+import { ta } from "zod/v4/locales"
+import { tasksRouter } from "./controllers/tasks"
 
 // Task service
 
@@ -14,6 +16,8 @@ app.get("/", (_req, res) => {
 app.get("/health", (_req, res) => {
   return res.json({ online: true, name: "Task service" })
 })
+app.use(express.json())
+app.use("/tasks", tasksRouter)
 
 app.use((_req, res, next) => {
   const err = new Error("Not found")

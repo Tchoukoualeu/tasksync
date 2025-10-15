@@ -1,7 +1,7 @@
 import express from "express"
 import cors from "cors"
 import { closeDB } from "../../../shared/config/db"
-import { userRouter } from "./controllers/user"
+import { userRouter } from "./controllers/users"
 
 // User service
 
