@@ -2,17 +2,22 @@ import { getDB } from "../../../../shared/config/db"
 import express, { Request, Response } from "express"
 import { v4 as uuidv4 } from "uuid"
 import * as z from "zod"
+import { getWithCache } from "../../../../shared/config/redisTask"
 
 const tasksRouter = express.Router()
 
 tasksRouter
-  .get("/", (_req: Request, res: Response) => {
-    const dbInstance = getDB()
-
+  .get("/", async (_req: Request, res: Response) => {
     try {
-      const query1 = dbInstance.prepare("SELECT * FROM tasks")
-
-      const tasks = query1.all()
+      const tasks = await getWithCache(
+        "all_tasks",
+        async () => {
+          const dbInstance = getDB()
+          const query = dbInstance.prepare("SELECT * FROM tasks")
+          return query.all()
+        },
+        60,
+      )
 
       return res.json(tasks)
     } catch (error) {
