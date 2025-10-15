@@ -1,145 +1,590 @@
 # TaskSync: Real-Time Collaborative Task Management API
 
-## Project Overview
-
-TaskSync is a scalable, real-time task management API built with Node.js, designed for teams to collaborate on tasks with features like task creation, assignment, status updates, and real-time notifications. The system uses a microservices architecture, WebSockets for real-time updates, and integrates with a modern tech stack.
-
-## Tech Stack
-
-- **Backend**: Node.js with Express.js
-- **Database**: MongoDB (for task and user data) + Redis (for caching and session management)
-- **Real-Time**: Socket.IO for WebSocket-based real-time updates
-- **Authentication**: JWT for secure API access
-- **Message Queue**: RabbitMQ for handling task assignment notifications
-- **Containerization**: Docker for service orchestration
-- **Testing**: Jest for unit and integration tests
-- **API Documentation**: Swagger/OpenAPI
-- **Deployment**: Deployable to AWS ECS or Kubernetes (optional)
+A scalable, real-time task management API built with Node.js and TypeScript, featuring microservices architecture, WebSocket-based real-time updates, and Redis caching for optimal performance.
 
 ## Features
 
-### User Management
+### Core Functionality
 
-- Register and authenticate users (JWT-based).
-- Role-based access (Admin, Member).
+- **User Management**: JWT-based authentication with role-based access control (Admin, Member)
+- **Task Management**: Complete CRUD operations for tasks with status tracking
+- **Real-Time Updates**: WebSocket-powered instant notifications for task changes
+- **Performance Optimization**: Redis caching with automatic invalidation
+- **Microservices Architecture**: Three independent, scalable services
 
-### Task Management
+### Key Features
 
-- Create, update, delete, and assign tasks.
-- Task status tracking (e.g., To Do, In Progress, Done).
-- Task comments and history.
+- Task creation, assignment, and status tracking (Pending → In Progress → Completed)
+- Real-time task update broadcasting to all connected clients
+- Redis pub/sub for inter-service messaging
+- JWT authentication and protected routes
+- Health check endpoints for monitoring
+- Graceful shutdown handling
+- Input validation with Zod schemas
 
-### Real-Time Collaboration
+## Architecture
 
-- Real-time task updates (e.g., when a task is assigned or updated).
-- Notifications for task assignments and status changes.
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Client/Frontend                           │
+│            (HTTP API + WebSocket Connection)                 │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+         ┌───────────────┼───────────────┐
+         │               │               │
+         v               v               v
+    ┌─────────┐    ┌─────────┐    ┌──────────────┐
+    │  User   │    │  Task   │    │Notification  │
+    │ Service │    │ Service │    │  Service     │
+    │ :3003   │    │ :3002   │    │  :3001       │
+    └────┬────┘    └────┬────┘    └────┬─────────┘
+         │              │              │
+         └──────────────┼──────────────┘
+                        │
+        ┌───────────────┼───────────────┐
+        │               │               │
+        v               v               v
+    ┌──────────┐  ┌──────────┐  ┌──────────────┐
+    │ SQLite   │  │  Redis   │  │    Redis     │
+    │ Database │  │  Cache   │  │   Pub/Sub    │
+    └──────────┘  └──────────┘  └──────────────┘
+```
 
-### Microservices
+### Data Flow
 
-- **User Service**: Manages user data and authentication.
-- **Task Service**: Handles task CRUD operations.
-- **Notification Service**: Manages real-time notifications and emails.
+1. Client makes HTTP request to Task Service (e.g., `POST /tasks`)
+2. Task Service writes to SQLite database
+3. Task Service invalidates relevant Redis cache entries
+4. Task Service publishes update to Redis pub/sub channel
+5. Notification Service receives pub/sub message
+6. Notification Service broadcasts update via Socket.IO to all connected clients
 
-### Scalability
+## Tech Stack
 
-- Redis for caching frequently accessed data.
-- RabbitMQ for asynchronous task processing (e.g., sending emails).
+### Backend
 
-### Monitoring
+- **Runtime**: Node.js 20+
+- **Framework**: Express.js 5.1.0
+- **Language**: TypeScript 5.9.3
 
-- Integrate Winston for logging and Prometheus for metrics.
+### Data Storage
+
+- **Database**: SQLite (via better-sqlite3)
+- **Caching**: Redis 5.8.3
+- **Pub/Sub**: Redis
+
+### Real-Time
+
+- **WebSocket**: Socket.IO 4.8.1
+
+### Authentication & Security
+
+- **JWT**: jsonwebtoken
+- **Password Hashing**: bcryptjs
+- **CORS**: cors middleware
+
+### Validation & Utilities
+
+- **Schema Validation**: Zod 4.1.12
+- **UUID**: uuid 13.0.0
+
+### Monitoring & Logging
+
+- **Logging**: Winston 3.14.2
+- **Metrics**: prom-client 15.1.3
+
+### Development Tools
+
+- **Testing**: Jest 29.7.0
+- **Linting**: ESLint 9.37.0
+- **Formatting**: Prettier 3.6.2
+- **Process Management**: concurrently
+
+## Prerequisites
+
+- **Node.js** >= 20.0.0
+- **npm** >= 9.0.0
+- **Redis** >= 6.0.0 (for caching and pub/sub)
+- **Docker** (optional, for containerized deployment)
+
+## Installation
+
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd tasksync
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Set up Redis
+
+**Option A: Using Docker**
+
+```bash
+docker run -d -p 6379:6379 --name redis redis:latest
+
+```
+
+**Option B: Local Installation**
+
+```bash
+# macOS
+brew install redis
+brew services start redis
+
+# Ubuntu/Debian
+sudo apt-get install redis-server
+sudo systemctl start redis
+
+# Windows (WSL or Redis for Windows)
+# Follow https://redis.io/docs/getting-started/installation/
+```
+
+### 4. Configure environment variables
+
+Create a `.env` file in the root directory:
+
+```bash
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+
+# JWT Configuration
+JWT_SECRET=your-secret-key-change-in-production
+
+# Frontend URL for CORS (Socket.IO)
+FRONTEND_URL=http://localhost:3000
+
+# Cache Configuration (optional)
+CACHE_TTL_SECONDS=60
+```
+
+### 5. Initialize the database
+
+The database will be automatically created when you first start the services. A default admin user will be created:
+
+- **Email**: admin@example.com
+- **Password**: admin123
+- **Role**: admin
+
+## Usage
+
+### Development Mode (Recommended)
+
+Run all three services concurrently with auto-reload:
+
+```bash
+npm run start:dev
+```
+
+This will start:
+
+- **User Service**: http://localhost:3003
+- **Task Service**: http://localhost:3002
+- **Notification Service**: http://localhost:3001
+
+### Production Mode (Docker)
+
+```bash
+npm start
+# or
+docker-compose up --build
+```
+
+### Run Individual Services
+
+```bash
+# User Service only
+npm run dev:user
+
+# Task Service only
+npm run dev:task
+
+# Notification Service only
+npm run dev:notification
+```
+
+### Verify Services are Running
+
+Check health endpoints:
+
+```bash
+curl http://localhost:3003/health  # User Service
+curl http://localhost:3002/health  # Task Service
+curl http://localhost:3001/health  # Notification Service
+```
+
+## API Documentation
+
+### User Service (Port 3003)
+
+#### Authentication Endpoints
+
+**Register New User**
+
+```http
+POST /users/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "password123",
+  "role": "member"
+}
+```
+
+**Login**
+
+```http
+POST /users/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+
+Response:
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "role": "member"
+  }
+}
+```
+
+**Get User Profile** (Protected)
+
+```http
+GET /users/profile
+Authorization: Bearer <jwt-token>
+
+Response:
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "role": "member"
+}
+```
+
+**List All Users**
+
+```http
+GET /users
+
+Response:
+[
+  {
+    "id": "uuid",
+    "email": "user@example.com",
+    "role": "member"
+  }
+]
+```
+
+### Task Service (Port 3002)
+
+**Create Task**
+
+```http
+POST /tasks
+Content-Type: application/json
+
+{
+  "title": "Implement feature X",
+  "description": "Add new feature to the application",
+  "status": "pending",
+  "assignee": "user-id-uuid"
+}
+
+Response:
+{
+  "id": "task-uuid",
+  "title": "Implement feature X",
+  "description": "Add new feature to the application",
+  "status": "pending",
+  "assignee": "user-id-uuid",
+  "comments": null
+}
+```
+
+**Get All Tasks**
+
+```http
+GET /tasks
+
+Response:
+[
+  {
+    "id": "task-uuid",
+    "title": "Implement feature X",
+    "status": "in_progress",
+    "assignee": "user-id-uuid"
+  }
+]
+```
+
+**Get Task by ID**
+
+```http
+GET /tasks/:id
+```
+
+**Update Task**
+
+```http
+PUT /tasks/:id
+Content-Type: application/json
+
+{
+  "status": "completed",
+  "comments": "Task completed successfully"
+}
+```
+
+**Delete Task**
+
+```http
+DELETE /tasks/:id
+```
+
+### Notification Service (Port 3001)
+
+**WebSocket Connection**
+
+```javascript
+import io from "socket.io-client"
+
+const socket = io("http://localhost:3001", {
+  withCredentials: true,
+})
+
+// Listen for task updates
+socket.on("task-update", (data) => {
+  console.log("Task updated:", data)
+})
+
+// Optional: Authenticate
+socket.emit("authenticate", { token: "your-jwt-token" })
+```
+
+**Health Check**
+
+```http
+GET /health
+
+Response:
+{
+  "online": true,
+  "name": "Notification service",
+  "socketio": true,
+  "connections": 5
+}
+```
 
 ## Project Structure
 
 ```
-tasksync-api/
+tasksync/
 ├── services/
-│   ├── user-service/
+│   ├── user-service/              # User authentication & management
 │   │   ├── src/
-│   │   │   ├── controllers/
-│   │   │   ├── models/
-│   │   │   ├── routes/
-│   │   │   ├── middleware/
-│   │   │   └── index.js
-│   │   ├── tests/
-│   │   └── Dockerfile
-│   ├── task-service/
+│   │   │   ├── index.ts          # Express app initialization
+│   │   │   └── routes/
+│   │   │       └── users.ts      # User endpoints
+│   │   └── package.json
+│   │
+│   ├── task-service/              # Task CRUD operations
 │   │   ├── src/
-│   │   │   ├── controllers/
-│   │   │   ├── models/
-│   │   │   ├── routes/
-│   │   │   └── index.js
-│   │   ├── tests/
-│   │   └── Dockerfile
-│   ├── notification-service/
-│   │   ├── src/
-│   │   │   ├── controllers/
-│   │   │   ├── sockets/
-│   │   │   └── index.js
-│   │   ├── tests/
-│   │   └── Dockerfile
-├── shared/
-│   ├── config/
-│   ├── utils/
-│   └── middleware/
-├── docker-compose.yml
-├── .env.example
-├── README.md
-└── package.json
+│   │   │   ├── index.ts          # Express app initialization
+│   │   │   └── routes/
+│   │   │       └── tasks.ts      # Task endpoints
+│   │   └── package.json
+│   │
+│   └── notification-service/      # WebSocket server
+│       ├── src/
+│       │   └── index.ts          # Socket.IO + Redis subscriber
+│       ├── public/
+│       │   └── index.html        # WebSocket test client
+│       └── package.json
+│
+├── shared/                        # Shared configurations
+│   └── config/
+│       ├── db.ts                 # SQLite database setup
+│       ├── auth.ts               # JWT authentication
+│       ├── redis.ts              # Redis cache client
+│       ├── redisPublisher.ts     # Redis pub/sub publisher
+│       ├── redisTask.ts          # Task caching utilities
+│       └── dto.ts                # Data validation schemas
+│
+├── scripts/
+│   ├── migrate-db.ts             # Database migration script
+│   └── stress-test-tasks.ts      # Load testing script
+│
+├── mydbo2.db                      # SQLite database file
+├── docker-compose.yml             # Docker orchestration
+├── package.json                   # Root package.json
+├── .env.example                   # Environment variables template
+└── README.md                      # This file
 ```
 
-## Implementation Steps
+## Database Schema
 
-### Setup Project
+### Users Table
 
-- Initialize a Node.js project with `npm init`.
-- Install dependencies: `express`, `mongoose`, `redis`, `socket.io`, `jsonwebtoken`, `amqplib`, `winston`, `prom-client`, `jest`, `swagger-ui-express`.
-- Configure ESLint and Prettier for code quality.
+```sql
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('admin', 'member'))
+);
+```
 
-### User Service
+### Tasks Table
 
-- Create a MongoDB schema for users (email, password, role).
-- Implement JWT-based authentication (login/register endpoints).
-- Add middleware for role-based access control.
+```sql
+CREATE TABLE tasks (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL CHECK(status IN ('pending', 'in_progress', 'completed')),
+  assignee TEXT,
+  comments TEXT,
+  FOREIGN KEY (assignee) REFERENCES users(id) ON DELETE SET NULL
+);
+```
 
-### Task Service
+## Development
 
-- Create a MongoDB schema for tasks (title, description, status, assignee, comments).
-- Implement CRUD endpoints for tasks.
-- Use Redis to cache task lists for faster retrieval.
+### Running Tests
 
-### Notification Service
+```bash
+# Run all tests
+npm test
 
-- Set up Socket.IO for real-time task updates.
-- Use RabbitMQ to queue notification tasks (e.g., send email on task assignment).
-- Integrate a third-party email service (e.g., SendGrid) for notifications.
+# Run tests for specific service
+npm run test:user
+npm run test:task
+npm run test:notification
+```
 
-### Real-Time Features
+### Code Quality
 
-- Use Socket.IO to broadcast task updates to relevant users.
-- Implement a WebSocket event for task comments and status changes.
+```bash
+# Lint code
+npm run lint
 
-### Testing
+# Format code
+npm run format
 
-- Write unit tests for controllers and services using Jest.
-- Write integration tests for API endpoints.
-- Mock MongoDB and Redis using `mongodb-memory-server` and `redis-mock`.
+# Build all services
+npm run build
+```
 
-### API Documentation
+### Stress Testing
 
-- Use Swagger to document all endpoints.
-- Host Swagger UI at `/api-docs`.
+Test the API with high load (creates 1000 tasks):
 
-### Containerization
+```bash
+npm run stress-test
+```
 
-- Write Dockerfiles for each service.
-- Use `docker-compose.yml` to orchestrate services (MongoDB, Redis, RabbitMQ, and Node.js services).
+### Docker Commands
 
-### Monitoring and Logging
+```bash
+# Build Docker images
+npm run docker:build
 
-- Use Winston for structured logging.
-- Expose metrics (e.g., request latency, error rates) using Prometheus.
+# Start services with Docker Compose
+npm start
 
-# Usage
+# Stop all services
+npm run docker:down
+```
 
-To run the task-service, `docker run -d -p 6379:6379 --name redis redis:latest` make sure redis is running
+## Environment Variables
+
+| Variable            | Description                         | Default                  |
+| ------------------- | ----------------------------------- | ------------------------ |
+| `REDIS_URL`         | Redis connection URL                | `redis://localhost:6379` |
+| `JWT_SECRET`        | Secret key for JWT signing          | (required)               |
+| `FRONTEND_URL`      | Frontend URL for CORS               | `http://localhost:3000`  |
+| `CACHE_TTL_SECONDS` | Cache expiration time               | `60`                     |
+| `TASK_SERVICE_URL`  | Task service endpoint (for scripts) | `http://localhost:3002`  |
+
+## Monitoring & Health Checks
+
+Each service exposes a `/health` endpoint for monitoring:
+
+```bash
+# Check all services
+curl http://localhost:3001/health
+curl http://localhost:3002/health
+curl http://localhost:3003/health
+```
+
+**Metrics available** (via prom-client):
+
+- Request latency
+- Error rates
+- Active connections (Socket.IO)
+- Cache hit/miss ratios
+
+## Troubleshooting
+
+### Redis Connection Issues
+
+```bash
+# Check if Redis is running
+redis-cli ping
+# Should respond with "PONG"
+
+# Check Redis connection
+redis-cli
+> INFO
+```
+
+### Port Already in Use
+
+```bash
+# Find and kill process using port 3001, 3002, or 3003
+lsof -ti:3001 | xargs kill -9
+lsof -ti:3002 | xargs kill -9
+lsof -ti:3003 | xargs kill -9
+```
+
+### Database Issues
+
+```bash
+# Delete and recreate database
+rm mydbo2.db
+npm run migrate
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License.
+
+## Support
+
+For issues and questions:
+
+- Open an issue on GitHub
+- Email: support@tasksync.com
+- Documentation: [Project Wiki](link-to-wiki)
