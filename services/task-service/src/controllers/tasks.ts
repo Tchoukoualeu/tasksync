@@ -1,5 +1,6 @@
 import { getDB } from "../../../../shared/config/db"
 import express, { Request, Response } from "express"
+import { v4 as uuidv4 } from "uuid"
 import * as z from "zod"
 
 const tasksRouter = express.Router()
@@ -70,9 +71,10 @@ tasksRouter
       const status = validatedTask.status || "pending"
       const assignee = validatedTask.assignee || null
       const query = dbInstance.prepare(
-        "INSERT INTO tasks (title, description, status, assignee, comments) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO tasks (id, title, description, status, assignee, comments) VALUES (?, ?, ?, ?, ?, ?)",
       )
       query.run(
+        uuidv4(),
         validatedTask.title,
         validatedTask.description,
         status,
