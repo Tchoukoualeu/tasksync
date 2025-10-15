@@ -3,6 +3,8 @@ import express, { Request, Response } from "express"
 import { v4 as uuidv4 } from "uuid"
 import * as z from "zod"
 import { getWithCache } from "../../../../shared/config/redisTask"
+import { redisPublisher } from "../../../../shared/config/redisPublisher"
+import { redisCache } from "../../../../shared/config/redis"
 
 const tasksRouter = express.Router()
 
@@ -50,7 +52,7 @@ tasksRouter
   })
 
   // title, description, status, assignee, comments)
-  .post("/", (req: Request, res: Response) => {
+  .post("/", async (req: Request, res: Response) => {
     const TaskSchema = z.object({
       title: z.string().min(1),
       description: z.string().min(1),
@@ -75,25 +77,39 @@ tasksRouter
       const dbInstance = getDB()
       const status = validatedTask.status || "pending"
       const assignee = validatedTask.assignee || null
+      const taskId = uuidv4()
+
       const query = dbInstance.prepare(
         "INSERT INTO tasks (id, title, description, status, assignee, comments) VALUES (?, ?, ?, ?, ?, ?)",
       )
       query.run(
-        uuidv4(),
+        taskId,
         validatedTask.title,
         validatedTask.description,
         status,
         assignee,
         JSON.stringify(validatedTask.comments),
       )
-      return res.status(201).json(validatedTask)
+
+      const createdTask = { id: taskId, ...validatedTask, status, assignee }
+
+      // Invalidate cache
+      await redisCache.del("all_tasks")
+
+      // Publish event
+      await redisPublisher.publish("task-updates", {
+        action: "created",
+        task: createdTask,
+      })
+
+      return res.status(201).json(createdTask)
     } catch (error) {
       console.error("Error creating task:", error)
       return res.status(500).json({ error: "Internal Server Error" })
     }
   })
 
-  .delete("/:id", (req: Request, res: Response) => {
+  .delete("/:id", async (req: Request, res: Response) => {
     const { id } = req.params
 
     if (!id) {
@@ -109,6 +125,15 @@ tasksRouter
         return res.status(404).json({ error: "Task not found" })
       }
 
+      // Invalidate cache
+      await redisCache.del("all_tasks")
+
+      // Publish event
+      await redisPublisher.publish("task-updates", {
+        action: "deleted",
+        taskId: id,
+      })
+
       return res.status(204).send()
     } catch (error) {
       console.error("Error deleting task:", error)
@@ -116,7 +141,7 @@ tasksRouter
     }
   })
 
-  .put("/:id", (req: Request, res: Response) => {
+  .put("/:id", async (req: Request, res: Response) => {
     const { id } = req.params
 
     if (!id) {
@@ -166,7 +191,20 @@ tasksRouter
         return res.status(404).json({ error: "Task not found" })
       }
 
-      return res.json({ id, ...validatedTask })
+      // Fetch the complete updated task
+      const selectQuery = dbInstance.prepare("SELECT * FROM tasks WHERE id = ?")
+      const updatedTask = selectQuery.get(id)
+
+      // Invalidate cache
+      await redisCache.del("all_tasks")
+
+      // Publish event
+      await redisPublisher.publish("task-updates", {
+        action: "updated",
+        task: updatedTask,
+      })
+
+      return res.json(updatedTask)
     } catch (error) {
       console.error("Error updating task:", error)
       return res.status(500).json({ error: "Internal Server Error" })

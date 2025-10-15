@@ -1,7 +1,7 @@
 import express from "express"
 import cors from "cors"
 import { ta } from "zod/v4/locales"
-import { tasksRouter } from "./controllers/tasks"
+import { tasksRouter } from "./routes/tasks"
 
 // Task service
 

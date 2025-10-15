@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskSync - Kanban Board</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            animation: fadeInScale 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: pulse 2s infinite;
+            transition: background 0.4s ease, box-shadow 0.4s ease;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+        }
+
+        .status-dot.connected {
+            background: #10b981;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+            animation: pulse-connected 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+            50% {
+                opacity: 0.5;
+                box-shadow: 0 0 0 4px rgba(239, 68, 68, 0);
+            }
+        }
+
+        @keyframes pulse-connected {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+            }
+            50% {
+                opacity: 1;
+                box-shadow: 0 0 0 4px rgba(16, 185, 129, 0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            justify-content: center;
+            animation: fadeInUp 0.5s ease-out 0.5s backwards;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #475569;
+        }
+
+        .btn-secondary:hover {
+            background: #f8fafc;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-secondary:active {
+            transform: translateY(0);
+        }
+
+        .kanban-board {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            animation: fadeInUp 0.5s ease-out 0.6s backwards;
+        }
+
+        .kanban-column {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .kanban-column:hover {
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+        }
+
+        .column-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid;
+        }
+
+        .column-header h2 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .column-count {
+            background: rgba(0, 0, 0, 0.1);
+            color: #1e293b;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .kanban-column.todo {
+            border-top: 4px solid #94a3b8;
+        }
+
+        .kanban-column.todo .column-header {
+            border-bottom-color: #94a3b8;
+            color: #475569;
+        }
+
+        .kanban-column.in-progress {
+            border-top: 4px solid #f59e0b;
+        }
+
+        .kanban-column.in-progress .column-header {
+            border-bottom-color: #f59e0b;
+            color: #d97706;
+        }
+
+        .kanban-column.completed {
+            border-top: 4px solid #10b981;
+        }
+
+        .kanban-column.completed .column-header {
+            border-bottom-color: #10b981;
+            color: #059669;
+        }
+
+        .tasks-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .tasks-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .tasks-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .tasks-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .tasks-list::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .task-card {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border-left: 4px solid transparent;
+        }
+
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .task-card.priority-high {
+            border-left-color: #ef4444;
+        }
+
+        .task-card.priority-medium {
+            border-left-color: #f59e0b;
+        }
+
+        .task-card.priority-low {
+            border-left-color: #10b981;
+        }
+
+        .task-title {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+            font-size: 15px;
+            line-height: 1.4;
+        }
+
+        .task-description {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .task-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        .task-id {
+            font-family: 'Courier New', monospace;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .task-priority {
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 600;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .task-priority.high {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .task-priority.medium {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .task-priority.low {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .empty-column {
+            text-align: center;
+            padding: 40px 20px;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .empty-column svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            opacity: 0.4;
+        }
+
+        @media (max-width: 768px) {
+            .kanban-board {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>TaskSync Board</h1>
+            <div class="status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-secondary" onclick="refreshTasks()">Refresh Tasks</button>
+            <button class="btn btn-primary" onclick="testConnection()">Test Connection</button>
+        </div>
+
+        <div class="kanban-board">
+            <div class="kanban-column todo">
+                <div class="column-header">
+                    <h2>To Do</h2>
+                    <span class="column-count" id="todoCount">0</span>
+                </div>
+                <div class="tasks-list" id="todoList">
+                    <div class="empty-column">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                        <p>No tasks yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kanban-column in-progress">
+                <div class="column-header">
+                    <h2>In Progress</h2>
+                    <span class="column-count" id="inProgressCount">0</span>
+                </div>
+                <div class="tasks-list" id="inProgressList">
+                    <div class="empty-column">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <p>No tasks in progress</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kanban-column completed">
+                <div class="column-header">
+                    <h2>Completed</h2>
+                    <span class="column-count" id="completedCount">0</span>
+                </div>
+                <div class="tasks-list" id="completedList">
+                    <div class="empty-column">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p>No completed tasks</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const tasks = new Map();
+        const API_URL = 'http://localhost:3002';
+
+        // Connection status
+        socket.on('connect', () => {
+            updateStatus(true);
+            console.log('Connected to Socket.IO server');
+            loadTasks();
+        });
+
+        socket.on('disconnect', () => {
+            updateStatus(false);
+            console.log('Disconnected from Socket.IO server');
+        });
+
+        // Listen for task updates
+        socket.on('task-update', (data) => {
+            console.log('Received task update:', data);
+            handleTaskUpdate(data);
+        });
+
+        function updateStatus(connected) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        function handleTaskUpdate(data) {
+            const { action, task, taskId } = data;
+
+            if (action === 'created' && task) {
+                tasks.set(task.id, task);
+                renderTask(task);
+            } else if (action === 'updated' && task) {
+                const oldTask = tasks.get(task.id);
+                tasks.set(task.id, task);
+
+                // Remove old task card if it exists
+                if (oldTask) {
+                    removeTaskCard(task.id);
+                }
+
+                // Render updated task in new location
+                renderTask(task);
+            } else if (action === 'deleted' && taskId) {
+                tasks.delete(taskId);
+                removeTaskCard(taskId);
+            }
+
+            updateColumnCounts();
+        }
+
+        async function loadTasks() {
+            try {
+                const response = await fetch(`${API_URL}/tasks`);
+                const data = await response.json();
+
+                // Task service returns tasks directly as an array
+                if (Array.isArray(data)) {
+                    tasks.clear();
+                    clearAllColumns();
+
+                    data.forEach(task => {
+                        tasks.set(task.id, task);
+                        renderTask(task);
+                    });
+
+                    updateColumnCounts();
+                    console.log(`Loaded ${data.length} tasks`);
+                }
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
+        }
+
+        function renderTask(task) {
+            const status = normalizeStatus(task.status);
+            const listId = getListIdByStatus(status);
+            const list = document.getElementById(listId);
+
+            if (!list) return;
+
+            // Remove empty state if present
+            const emptyState = list.querySelector('.empty-column');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // Create task card
+            const taskCard = document.createElement('div');
+            taskCard.className = `task-card priority-${task.priority || 'medium'}`;
+            taskCard.dataset.taskId = task.id;
+            taskCard.onclick = () => moveTask(task.id);
+
+            taskCard.innerHTML = `
+                <div class="task-title">${escapeHtml(task.title)}</div>
+                ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
+                <div class="task-meta">
+                    <span class="task-id">#${task.id}</span>
+                    ${task.priority ? `<span class="task-priority ${task.priority}">${task.priority}</span>` : ''}
+                </div>
+            `;
+
+            list.appendChild(taskCard);
+        }
+
+        function removeTaskCard(taskId) {
+            const card = document.querySelector(`[data-task-id="${taskId}"]`);
+            if (card) {
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    card.remove();
+                    checkEmptyColumns();
+                    updateColumnCounts();
+                }, 300);
+            }
+        }
+
+        function clearAllColumns() {
+            ['todoList', 'inProgressList', 'completedList'].forEach(listId => {
+                const list = document.getElementById(listId);
+                list.innerHTML = '';
+            });
+            checkEmptyColumns();
+        }
+
+        function checkEmptyColumns() {
+            const columns = [
+                { id: 'todoList', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', text: 'No tasks yet' },
+                { id: 'inProgressList', icon: 'M13 10V3L4 14h7v7l9-11h-7z', text: 'No tasks in progress' },
+                { id: 'completedList', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', text: 'No completed tasks' }
+            ];
+
+            columns.forEach(col => {
+                const list = document.getElementById(col.id);
+                if (list && list.children.length === 0) {
+                    list.innerHTML = `
+                        <div class="empty-column">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${col.icon}"></path>
+                            </svg>
+                            <p>${col.text}</p>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        function updateColumnCounts() {
+            const counts = { todo: 0, 'in-progress': 0, completed: 0 };
+
+            tasks.forEach(task => {
+                const status = normalizeStatus(task.status);
+                if (counts.hasOwnProperty(status)) {
+                    counts[status]++;
+                }
+            });
+
+            document.getElementById('todoCount').textContent = counts.todo;
+            document.getElementById('inProgressCount').textContent = counts['in-progress'];
+            document.getElementById('completedCount').textContent = counts.completed;
+        }
+
+        async function moveTask(taskId) {
+            const task = tasks.get(taskId);
+            if (!task) return;
+
+            const currentStatus = normalizeStatus(task.status);
+            const statusFlow = ['todo', 'in-progress', 'completed'];
+            const currentIndex = statusFlow.indexOf(currentStatus);
+            const nextIndex = (currentIndex + 1) % statusFlow.length;
+            const newStatus = statusFlow[nextIndex];
+
+            try {
+                const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (!response.ok) {
+                    console.error('Failed to update task:', response.statusText);
+                    return;
+                }
+
+                const updatedTask = await response.json();
+                console.log('Task updated:', updatedTask);
+            } catch (error) {
+                console.error('Error updating task:', error);
+            }
+        }
+
+        function normalizeStatus(status) {
+            if (!status) return 'todo';
+            const normalized = status.toLowerCase().replace(/[_\s]+/g, '-');
+            return ['todo', 'in-progress', 'completed'].includes(normalized) ? normalized : 'todo';
+        }
+
+        function getListIdByStatus(status) {
+            const statusMap = {
+                'todo': 'todoList',
+                'in-progress': 'inProgressList',
+                'completed': 'completedList'
+            };
+            return statusMap[status] || 'todoList';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function refreshTasks() {
+            loadTasks();
+        }
+
+        function testConnection() {
+            if (socket.connected) {
+                alert('Socket.IO is connected!\nSocket ID: ' + socket.id);
+            } else {
+                alert('Socket.IO is NOT connected. Check the console for errors.');
+            }
+        }
+    </script>
+</body>
+</html>

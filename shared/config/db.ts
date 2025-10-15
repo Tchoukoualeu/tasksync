@@ -7,7 +7,7 @@ let dbInstance: Database.Database | null = null
 
 function getDB() {
   if (!dbInstance) {
-    dbInstance = new Database("./mydbo.db")
+    dbInstance = new Database("./mydbo2.db")
 
     console.log("Connected to SQLite database.")
 

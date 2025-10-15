@@ -22,7 +22,9 @@
     "format": "prettier --write services/**/*.ts",
     "build": "npm run build --workspaces",
     "docker:build": "docker-compose build",
-    "docker:down": "docker-compose down"
+    "docker:down": "docker-compose down",
+    "migrate": "tsx scripts/migrate-db.ts",
+    "stress-test": "tsx scripts/stress-test-tasks.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
