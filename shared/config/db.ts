@@ -26,7 +26,7 @@ function getDB() {
         title TEXT NOT NULL,
         description TEXT,
         status TEXT NOT NULL,
-        assignee INTEGER,
+        assignee TEXT,
         comments TEXT,
         FOREIGN KEY (assignee) REFERENCES users(id) ON DELETE SET NULL
       );
