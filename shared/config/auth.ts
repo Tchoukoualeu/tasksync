@@ -10,6 +10,7 @@ const JWT_EXPIRES_IN = "7d"
 export interface AuthUser {
   id: string
   email: string
+  role?: string
 }
 
 export interface AuthRequest extends Request {

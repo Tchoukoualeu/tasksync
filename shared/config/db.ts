@@ -7,7 +7,7 @@ let dbInstance: Database.Database | null = null
 
 function getDB() {
   if (!dbInstance) {
-    dbInstance = new Database("./mydb.db")
+    dbInstance = new Database("./mydbo.db")
 
     console.log("Connected to SQLite database.")
 
@@ -38,11 +38,6 @@ function getDB() {
       SELECT '${uuidv4()}', 'adminpass', 'admin', 'admin@example.com'
       WHERE NOT EXISTS (SELECT 1 FROM users)
     `)
-
-    const query1 = dbInstance.prepare("SELECT * FROM users")
-    console.log(query1.all())
-
-    console.log("Users table ready.")
   }
   return dbInstance
 }

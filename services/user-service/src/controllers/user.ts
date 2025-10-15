@@ -18,7 +18,7 @@ userRouter
     const dbInstance = getDB()
 
     try {
-      const query1 = dbInstance.prepare("SELECT * FROM users")
+      const query1 = dbInstance.prepare("SELECT id, email, role FROM users")
 
       const users = query1.all()
 
@@ -56,17 +56,19 @@ userRouter
           .send({ message: "This user already exist.", user: null })
       }
 
-      dbInstance.exec(`
-        INSERT INTO users (id, password, role, email)
-        SELECT '${uuidv4()}', '${hashedPass}', 'admin', '${email}'
-        WHERE NOT EXISTS (SELECT 1 FROM users)
-      `)
+      const insertUser = dbInstance.prepare(
+        "INSERT INTO users (id, password, role, email) VALUES (?, ?, ?, ?)",
+      )
+      insertUser.run(uuidv4(), hashedPass, "admin", email)
 
-      const user = getUserByEmail.get(email)
+      const getUserWithoutPassword = dbInstance.prepare(
+        "SELECT id, email, role FROM users WHERE email = ?",
+      )
+      const user = getUserWithoutPassword.get(email)
 
       return res.json({ user })
     } catch (error) {
-      console.error("Error fetching users:", error)
+      console.error("Error registering a user:", error)
       return res.status(500).json({ error: "Internal Server Error" })
     }
   })
@@ -84,7 +86,10 @@ userRouter
     }
 
     const token = generateToken(user)
-    res.json({ token, user })
+    res.json({
+      token,
+      user: { id: user.id, email: user.email, role: user.role },
+    })
   })
 
 export { userRouter }
