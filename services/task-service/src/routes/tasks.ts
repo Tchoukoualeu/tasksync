@@ -88,7 +88,7 @@ tasksRouter
         validatedTask.description,
         status,
         assignee,
-        JSON.stringify(validatedTask.comments),
+        validatedTask.comments,
       )
 
       const createdTask = { id: taskId, ...validatedTask, status, assignee }
