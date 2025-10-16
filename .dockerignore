@@ -1,0 +1,57 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Build outputs
+dist
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Testing
+coverage
+*.test.ts
+*.spec.ts
+tests
+
+# Documentation
+*.md
+README.md
+docs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Database files (will be created in containers)
+*.db
+*.db-shm
+*.db-wal
+
+# Claude Code
+.claude
+
+# Scripts (not needed in production)
+scripts
