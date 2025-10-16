@@ -205,3 +205,7 @@ npm run stress-test
 | `FRONTEND_URL`      | Frontend URL for CORS               | `http://localhost:3000`  |
 | `CACHE_TTL_SECONDS` | Cache expiration time               | `60`                     |
 | `TASK_SERVICE_URL`  | Task service endpoint (for scripts) | `http://localhost:3002`  |
+
+## TODO
+
+- Add Auth for CRUD operation for tasks
