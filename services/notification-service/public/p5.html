@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskSync - Live Task Flow Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            overflow: hidden;
+        }
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 14, 39, 0.9);
+            padding: 20px;
+            border-radius: 12px;
+            color: #fff;
+            width: 280px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        #info-panel h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            color: #6366f1;
+        }
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+        }
+        .stat-label {
+            color: #94a3b8;
+        }
+        .stat-value {
+            font-weight: bold;
+        }
+        .status-pending { color: #fbbf24; }
+        .status-in-progress { color: #60a5fa; }
+        .status-completed { color: #34d399; }
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        .user-active {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #34d399;
+            box-shadow: 0 0 10px #34d399;
+        }
+        .user-inactive {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #64748b;
+        }
+        #legend {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 14, 39, 0.9);
+            padding: 20px;
+            border-radius: 12px;
+            color: #fff;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="legend">
+        <h2>Task States</h2>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #fbbf24;"></div>
+            <span>Pending</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #60a5fa;"></div>
+            <span>In Progress</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #34d399;"></div>
+            <span>Completed</span>
+        </div>
+    </div>
+
+    <div id="info-panel">
+        <h2>Live Stats</h2>
+        <div class="stat">
+            <span class="stat-label">Pending:</span>
+            <span class="stat-value status-pending" id="pending-count">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">In Progress:</span>
+            <span class="stat-value status-in-progress" id="progress-count">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Completed:</span>
+            <span class="stat-value status-completed" id="completed-count">0</span>
+        </div>
+        <h2 style="margin-top: 20px;">Users</h2>
+        <div id="users-list"></div>
+    </div>
+
+    <script>
+        // Socket.io connection
+        const socket = io('http://localhost:3001');
+
+        // Task visualization data
+        let tasks = [];
+        let users = [];
+        let activeUsers = new Set();
+
+        // Task lanes (y-positions for each status)
+        const lanes = {
+            'pending': 0.25,
+            'in-progress': 0.5,
+            'completed': 0.75
+        };
+
+        // Color scheme
+        const colors = {
+            'pending': [251, 191, 36],      // Amber
+            'in-progress': [96, 165, 250],  // Blue
+            'completed': [52, 211, 153]     // Green
+        };
+
+        class Task {
+            constructor(data) {
+                this.id = data.id;
+                this.title = data.title;
+                this.status = data.status || 'pending';
+                this.assignee = data.assignee;
+                this.x = random(50, width - 50);
+                this.y = height * lanes[this.status];
+                this.targetY = this.y;
+                this.size = 40;
+                this.targetSize = 40;
+                this.opacity = 0;
+                this.rotation = 0;
+                this.hue = 0;
+                this.pulsePhase = random(TWO_PI);
+                this.created = millis();
+                this.trail = [];
+            }
+
+            updateStatus(newStatus) {
+                if (this.status !== newStatus) {
+                    this.status = newStatus;
+                    this.targetY = height * lanes[newStatus];
+                    this.targetSize = 50;
+                    this.rotation = 0;
+                    // Flash effect
+                    setTimeout(() => {
+                        this.targetSize = 40;
+                    }, 300);
+                }
+            }
+
+            update() {
+                // Smooth transitions
+                this.y = lerp(this.y, this.targetY, 0.08);
+                this.size = lerp(this.size, this.targetSize, 0.15);
+                this.opacity = min(this.opacity + 5, 255);
+                this.rotation += 0.01;
+                this.pulsePhase += 0.05;
+
+                // Trail effect
+                this.trail.push({x: this.x, y: this.y, opacity: 50});
+                if (this.trail.length > 15) {
+                    this.trail.shift();
+                }
+
+                // Slow horizontal drift
+                this.x += sin(millis() * 0.001 + this.created) * 0.3;
+                this.x = constrain(this.x, 50, width - 50);
+            }
+
+            display() {
+                // Draw trail
+                for (let i = 0; i < this.trail.length; i++) {
+                    let t = this.trail[i];
+                    let alpha = map(i, 0, this.trail.length, 0, t.opacity);
+                    let col = colors[this.status];
+                    fill(col[0], col[1], col[2], alpha);
+                    noStroke();
+                    let trailSize = map(i, 0, this.trail.length, this.size * 0.3, this.size * 0.8);
+                    circle(t.x, t.y, trailSize);
+                }
+
+                push();
+                translate(this.x, this.y);
+                rotate(this.rotation);
+
+                // Outer glow
+                let col = colors[this.status];
+                let pulseSize = sin(this.pulsePhase) * 5;
+                for (let i = 3; i > 0; i--) {
+                    fill(col[0], col[1], col[2], 30 / i);
+                    noStroke();
+                    circle(0, 0, this.size + pulseSize + i * 15);
+                }
+
+                // Main circle
+                fill(col[0], col[1], col[2], this.opacity);
+                stroke(255, this.opacity * 0.8);
+                strokeWeight(2);
+                circle(0, 0, this.size + pulseSize);
+
+                // Inner detail
+                noFill();
+                stroke(255, this.opacity * 0.5);
+                strokeWeight(1);
+                circle(0, 0, this.size * 0.6);
+
+                // Draw rotating segments
+                for (let i = 0; i < 8; i++) {
+                    let angle = (TWO_PI / 8) * i + this.rotation * 2;
+                    let x1 = cos(angle) * this.size * 0.3;
+                    let y1 = sin(angle) * this.size * 0.3;
+                    let x2 = cos(angle) * this.size * 0.45;
+                    let y2 = sin(angle) * this.size * 0.45;
+                    line(x1, y1, x2, y2);
+                }
+
+                // Display user indicator if assigned
+                if (this.assignee) {
+                    fill(255, this.opacity);
+                    noStroke();
+                    textAlign(CENTER, CENTER);
+                    textSize(10);
+                    text(this.assignee.charAt(0).toUpperCase(), 0, 0);
+                }
+
+                pop();
+
+                // Display title on hover
+                if (dist(mouseX, mouseY, this.x, this.y) < this.size / 2) {
+                    fill(255);
+                    noStroke();
+                    textAlign(CENTER);
+                    textSize(12);
+                    text(this.title, this.x, this.y - this.size);
+                    if (this.assignee) {
+                        textSize(10);
+                        fill(200);
+                        text('Assigned to: ' + this.assignee, this.x, this.y - this.size - 15);
+                    }
+                }
+            }
+        }
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            textFont('Arial');
+
+            // Fetch initial data
+            fetchTasks();
+            fetchUsers();
+
+            // Socket.io listeners
+            socket.on('connect', () => {
+                console.log('Connected to WebSocket');
+            });
+
+            socket.on('task-update', (data) => {
+                console.log('Task update received:', data);
+                handleTaskUpdate(data);
+            });
+        }
+
+        function draw() {
+            // Background with fade effect
+            background(10, 14, 39, 25);
+
+            // Draw lane separators
+            stroke(255, 30);
+            strokeWeight(1);
+            for (let status in lanes) {
+                let y = height * lanes[status];
+                line(0, y, width, y);
+            }
+
+            // Update and display tasks
+            for (let task of tasks) {
+                task.update();
+                task.display();
+            }
+
+            // Draw particles in background
+            drawParticles();
+        }
+
+        let particles = [];
+        function drawParticles() {
+            if (frameCount % 3 === 0) {
+                particles.push({
+                    x: random(width),
+                    y: random(height),
+                    size: random(1, 3),
+                    life: 255
+                });
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.life -= 2;
+                fill(255, p.life);
+                noStroke();
+                circle(p.x, p.y, p.size);
+
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        async function fetchTasks() {
+            try {
+                const response = await fetch('http://localhost:3002/tasks');
+                const data = await response.json();
+                tasks = data.map(taskData => new Task(taskData));
+                updateStats();
+            } catch (error) {
+                console.error('Error fetching tasks:', error);
+            }
+        }
+
+        async function fetchUsers() {
+            try {
+                const response = await fetch('http://localhost:3003/users');
+                const data = await response.json();
+                users = data;
+                updateUsersList();
+            } catch (error) {
+                console.error('Error fetching users:', error);
+            }
+        }
+
+        function handleTaskUpdate(data) {
+            console.log('Handling task update:', data.action);
+
+            if (data.action === 'created') {
+                const newTask = new Task(data.task);
+                tasks.push(newTask);
+                showNotification('New task created: ' + data.task.title);
+            } else if (data.action === 'updated') {
+                const taskIndex = tasks.findIndex(t => t.id === data.task.id);
+                if (taskIndex !== -1) {
+                    tasks[taskIndex].updateStatus(data.task.status);
+                    tasks[taskIndex].assignee = data.task.assignee;
+
+                    if (data.task.assignee) {
+                        activeUsers.add(data.task.assignee);
+                        showNotification('Task assigned to ' + data.task.assignee);
+                    }
+                } else {
+                    // Task doesn't exist locally, add it
+                    tasks.push(new Task(data.task));
+                }
+            } else if (data.action === 'deleted') {
+                const taskIndex = tasks.findIndex(t => t.id === data.taskId);
+                if (taskIndex !== -1) {
+                    tasks.splice(taskIndex, 1);
+                }
+            }
+
+            updateStats();
+            updateUsersList();
+        }
+
+        function updateStats() {
+            const pending = tasks.filter(t => t.status === 'pending').length;
+            const inProgress = tasks.filter(t => t.status === 'in-progress').length;
+            const completed = tasks.filter(t => t.status === 'completed').length;
+
+            document.getElementById('pending-count').textContent = pending;
+            document.getElementById('progress-count').textContent = inProgress;
+            document.getElementById('completed-count').textContent = completed;
+        }
+
+        function updateUsersList() {
+            // Update active users based on task assignments
+            activeUsers.clear();
+            tasks.forEach(task => {
+                if (task.assignee && (task.status === 'in-progress' || task.status === 'pending')) {
+                    activeUsers.add(task.assignee);
+                }
+            });
+
+            const usersList = document.getElementById('users-list');
+            usersList.innerHTML = '';
+
+            users.forEach(user => {
+                const isActive = activeUsers.has(user.email) || activeUsers.has(user.id);
+                const taskCount = tasks.filter(t =>
+                    (t.assignee === user.email || t.assignee === user.id) &&
+                    t.status !== 'completed'
+                ).length;
+
+                const userDiv = document.createElement('div');
+                userDiv.className = 'user-item';
+                userDiv.innerHTML = `
+                    <span>${user.email}</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${taskCount > 0 ? `<span style="color: #60a5fa; font-weight: bold;">${taskCount}</span>` : ''}
+                        <div class="${isActive ? 'user-active' : 'user-inactive'}"></div>
+                    </div>
+                `;
+                usersList.appendChild(userDiv);
+            });
+        }
+
+        function showNotification(message) {
+            // Create a temporary notification
+            const notif = document.createElement('div');
+            notif.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(99, 102, 241, 0.95);
+                color: white;
+                padding: 20px 40px;
+                border-radius: 12px;
+                font-size: 16px;
+                z-index: 1000;
+                animation: fadeInOut 2s ease-in-out;
+                box-shadow: 0 8px 32px rgba(99, 102, 241, 0.5);
+            `;
+            notif.textContent = message;
+            document.body.appendChild(notif);
+
+            setTimeout(() => {
+                notif.remove();
+            }, 2000);
+        }
+
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+    </script>
+</body>
+</html>

@@ -63,7 +63,7 @@ function generateTaskData(index: number): Omit<Task, "id"> {
   return {
     title: `Task #${index}: ${randomTaskName()}`,
     description: `This is test task number ${index} created for stress testing the notification system`,
-    status: statuses[Math.floor(Math.random() * statuses.length)],
+    status: "pending",
     assignee: Math.random() > 0.5 ? randomUserId() : null,
     comments: `Initial comment for task ${index}`,
   }
@@ -86,7 +86,13 @@ function randomTaskName(): string {
 }
 
 function randomUserId(): string {
-  const userIds = ["user-1", "user-2", "user-3", "user-4", "user-5"]
+  const userIds = [
+    "c128ebf6-2861-4be2-a2a3-1eca7406da52",
+    "1fb64027-60f1-4721-bfd0-d51c05dbedf5",
+    "b39664bd-84e4-4e76-95dd-31e6c923be40",
+    "6b9d6fed-e8d0-4468-9419-be439dc5428c",
+    "7f1d1a3c-471d-400d-9a0a-0ae142e36a90",
+  ]
   return userIds[Math.floor(Math.random() * userIds.length)]
 }
 
@@ -182,8 +188,7 @@ async function completeSomeTasks(count: number): Promise<void> {
     // Filter to only incomplete tasks that we created
     const incompleteTasks = tasks.filter(
       (task) =>
-        createdTaskIds.includes(task.id || "") &&
-        task.status !== "completed",
+        createdTaskIds.includes(task.id || "") && task.status !== "completed",
     )
 
     // Complete up to 'count' tasks
@@ -191,9 +196,14 @@ async function completeSomeTasks(count: number): Promise<void> {
 
     for (const task of tasksToComplete) {
       try {
-        await apiCall("PUT", `/tasks/${task.id}`, { status: "completed" })
-        stats.completed++
-        console.log(`  ✓ Auto-completed task ${task.id} to make room`)
+        if (task.status === "in-progress") {
+          await apiCall("PUT", `/tasks/${task.id}`, { status: "completed" })
+          stats.completed++
+        } else {
+          await apiCall("PUT", `/tasks/${task.id}`, { status: "in-progress" })
+          stats.updated++
+        }
+
         await sleep(DELAY_BETWEEN_CALLS_MS)
       } catch (error) {
         // Continue on error
@@ -243,6 +253,24 @@ async function createTasks(): Promise<void> {
   console.log(
     `✅ Phase 1 complete: ${stats.created} tasks created in ${elapsed}s`,
   )
+}
+
+// Phase 1: Create all tasks
+async function cleanTasks(): Promise<void> {
+  try {
+    const tasks = await apiCall("GET", "/tasks", undefined)
+
+    for (const task of tasks) {
+      await fetch(`${TASK_SERVICE_URL}/${task.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      })
+      await apiCall("DELETE", `/tasks/${task.id}`)
+    }
+  } catch (err) {
+    console.log(err)
+    console.log("Failed to delete existing tasks")
+  }
 }
 
 // Phase 2: Update tasks randomly
@@ -366,6 +394,8 @@ async function main() {
     console.log("✅ Connection successful")
 
     // Run all phases
+
+    await cleanTasks()
     await createTasks()
     await updateTasks()
     await completeTasks()
