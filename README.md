@@ -2,6 +2,12 @@
 
 A scalable, real-time task management API built with Node.js and TypeScript, featuring microservices architecture, WebSocket-based real-time updates, and Redis caching for optimal performance.
 
+
+
+https://github.com/user-attachments/assets/312838bd-f77b-4eab-8b15-f2ca13ac0fa7
+
+
+
 ## Features
 
 ### Core Functionality
