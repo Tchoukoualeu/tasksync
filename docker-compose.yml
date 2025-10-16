@@ -1,1 +1,113 @@
 # Docker Compose configuration for TaskSync services
+version: '3.8'
+
+services:
+  # Redis service for caching and pub/sub
+  redis:
+    image: redis:7-alpine
+    container_name: tasksync-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - tasksync-network
+    restart: unless-stopped
+
+  # Notification Service - Real-time WebSocket notifications
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: tasksync-notification-service
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - PORT=3001
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - tasksync-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Task Service - Task management CRUD operations
+  task-service:
+    build:
+      context: .
+      dockerfile: services/task-service/Dockerfile
+    container_name: tasksync-task-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-60}
+      - PORT=3002
+    volumes:
+      - task-db-data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - tasksync-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # User Service - Authentication and user management
+  user-service:
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
+    container_name: tasksync-user-service
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - PORT=3003
+    volumes:
+      - user-db-data:/app/data
+    networks:
+      - tasksync-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+# Named volumes for data persistence
+volumes:
+  redis-data:
+    driver: local
+  task-db-data:
+    driver: local
+  user-db-data:
+    driver: local
+
+# Custom network for service communication
+networks:
+  tasksync-network:
+    driver: bridge
