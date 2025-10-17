@@ -60,12 +60,6 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log(`❌ Client disconnected: ${socket.id}`)
   })
-
-  // Optional: Handle client authentication here
-  socket.on("authenticate", (data) => {
-    // Add your authentication logic here if needed
-    console.log(`🔐 Client authenticated: ${socket.id}`, data)
-  })
 })
 
 // Express routes
